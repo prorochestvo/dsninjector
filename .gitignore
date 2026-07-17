@@ -48,3 +48,6 @@ init/models/*
 # Project configs and environment
 store.toml
 .env**
+# Claude Code: commit only project settings
+.claude/*
+!.claude/settings.json

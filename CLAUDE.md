@@ -34,66 +34,40 @@ Public surface at the top, private internals at the bottom - a reader sees every
 
 No custom error type - exported funcs return plain `error`. Contract to preserve: wrap propagated failures with `%w` (so callers can `errors.Is`/`errors.As`; `readEnvVarName` also `errors.Join`s the deferred `Close` error), return plain sentinel-free errors for bad input (no regex match, empty/whitespace config), and reserve error-swallowing for the explicitly best-effort `*OrEmpty` helpers (`UnmarshalOrEmpty` returns an empty `DataSourceMapper`, never errors).
 
-## Constraints
+## Conventions
 
-- **Zero runtime dependencies**: this is a standard-library-only library. Keep it that
-  way — `go.mod`'s only non-indirect `require` is `testify`, and it must stay
-  **test-only**. Do not introduce a third-party runtime import without an explicit
-  decision; nothing CGO-dependent may enter the build.
-- **Testing**: Use `github.com/stretchr/testify`; run tests with `-race`; parallel
-  subtests preferred where there's no shared mutable state.
-- **One `Test*` per method, scenarios as subtests**: each tested method/function gets
-  exactly one top-level test function named after it (e.g. `TestEncode` for `Encode`),
-  and every scenario for that method lives as a `t.Run("descriptive name", ...)`
-  subtest inside it. Do **not** create separate top-level tests like
-  `TestEncode_EmptyInput`, `TestEncode_Unicode`, `TestEncode_Error` — these belong
-  as subtests of a single `TestEncode`. Methods on a type follow the same rule with
-  the standard `TestType_Method` form (e.g. `TestUser_Validate`).
-- **No CGO**: `CGO_ENABLED=0` must be set for all build and test commands (unless the
-  project intentionally requires CGO).
-- **Compile-time interface checks**: Any type that implements an interface (notably
-  `DataSourceMapper` against `DataSource`), and every mock/stub struct in test files,
-  must have a `var _ DataSource = &DataSourceMapper{}` style assertion so the
-  implementation is enforced at compile time.
-- **No section-divider comments**: Do not use `// --- section ---` or `// ----` style
-  separator comments. Let the code structure speak for itself.
-- **No skipped errors**: Never use `_` to discard error return values in production or
-  test code. Always capture the error and assert/check it. The only exceptions are
-  `fmt.Fprint*` writes to loggers, `Rollback()` calls in error-recovery paths, and
-  resource `.Close()` in `t.Cleanup` / `defer`.
-- **Comments**: all comments are in English and start with a lowercase first word
-  (e.g. `// wrap the driver error so callers can match on it`).
-- **Godoc on exported identifiers**: every exported Type/Func/Method/Var/Const gets a doc comment starting with its name, ending with a period; skip it if it would only restate the signature. Exactly one `// Package <name> ...` per package; `cmd/*` uses `// Command <name> ...`. Document the non-obvious: concurrency guarantees, the `%w`-wrap-vs-swallow error contract, and coercions like `Port` returning `0` on a bad value. Preserve existing WHY-comments verbatim; don't bulk-comment private helpers.
-- **Scratch artifacts stay out of the repo root**: this library ships no binaries, so
-  `go build` produces nothing to place. Any throwaway artifacts, fixtures, coverage
-  profiles, or intermediate files belong in `./tmp/` (not the repo root, where
-  `git add .` would pick them up). Keep `cover.out` and similar out of commits.
+Generic Go conventions (style, file declaration order, test structure, test-only
+code placement, godoc, error discipline, code organization) come from the
+`stack-go` plugin skills — they are not restated here. Project-specific constraints:
 
-## Planning Workflow
+- **Zero runtime dependencies**: this is a standard-library-only library. `go.mod`'s
+  only non-indirect `require` is `testify`, and it must stay **test-only**. Do not
+  introduce a third-party runtime import without an explicit decision; nothing
+  CGO-dependent may enter the build.
+- **Compile-time interface checks** apply to production types too — notably
+  `var _ DataSource = &DataSourceMapper{}`, not just test mocks.
+- **No Makefile**: gates run as raw Go commands from the module root
+  (`gofmt -l .`, `CGO_ENABLED=0 go vet ./...`, `CGO_ENABLED=0 go test -race .`).
+  Keep `cover.out` and other scratch under `./tmp/`, never the repo root.
 
-Non-trivial work gets a Markdown plan file before code. Plans live in `plans/`, with `plans/completed/` and `plans/history/` subdirs.
+## Working agreement
 
-Naming:
-- Active (`plans/`): `NNN-kebab-slug.md`, zero-padded sequential; next number = highest existing prefix across `plans/`, `completed/`, `history/`.
-- Completed (`plans/completed/`): `YYMMDD.NNNN.slug.md`; `NNNN` is a per-day index resetting to `0001` daily.
-- Archived (`plans/history/`): keeps the original `NNN-` name.
+All non-trivial work follows the plan-first pipeline:
 
-Lifecycle: create in `plans/` -> implement (file stays put) -> on all criteria met + tests green, `mv` to `completed/` with the date name -> if abandoned/superseded, move to `history/`.
+1. **Plan** — the `architect` agent writes `plans/NNN-slug.md` (create via the
+   `pipeline:new-plan` skill). No source edits before a plan exists.
+2. **Implement** — the `engineer` agent executes the plan's tasks with tests.
+3. **Review** — three `reviewer` agents launched in parallel in ONE message, each
+   prompt naming its lens (A: correctness & tests, B: security & operations,
+   C: performance & architecture) and the changed files. Full three-lens fan-out is
+   mandatory on the first review; the post-fix re-review is ONE solo reviewer scoped
+   to the changed lines.
+4. **Gate** — `gofmt -l .` clean, `go vet` and `go test -race .` green (all with
+   `CGO_ENABLED=0`) before review; a red tree goes to the `testdoctor` agent first.
+5. **Complete** — the orchestrator merges the three reports, deduplicates, resolves
+   conflicting verdicts (naming what was rejected and why; the user has final say).
+   P0/P1 findings loop back to the engineer. Only when every P0/P1 is fixed or
+   explicitly accepted: move the plan via the `pipeline:complete-plan` skill.
 
-Rules: one plan per concern; plan (or confirm an existing one) before touching source; keep the plan honest (update it if implementation diverges, before completing); slug readable at a glance.
-
-Plan format sections: Overview, Assumptions, Tasks (each: Description / Acceptance Criteria / Pitfalls & edge cases / Complexity Easy|Medium|Hard), Execution Order, Risks, Trade-offs.
-
-## Agent Pipeline
-
-Non-trivial tasks run three stages with the `gocode-*` agents (defined in `.claude/agents/`):
-
-1. `gocode-architect` -> writes the plan file in `plans/` (see Planning Workflow).
-2. `gocode-engineer` -> implements the plan's tasks + tests.
-3. `gocode-reviewer` x3 in parallel (one message, three tool calls), each a distinct lens:
-   - A correctness & tests (races, edge/error paths, context, cleanup, test structure/coverage)
-   - B security & ops (input validation, auth, secrets, injection, observability/log volume)
-   - C performance & architecture (allocs, blocking I/O, leaks, layering, API/breaking changes)
-   Each lens prompt names its focus AND what to SKIP; deliverable is P0-P3 findings with `file:line` + patch sketch.
-
-The orchestrator (main session) synthesises the three reports, resolves conflicts (naming the rejected call), and gates completion: the plan moves to `plans/completed/` only once every P0/P1 is fixed or explicitly accepted. The first review is always the full three-lens fan-out; after a fix, re-review is a SINGLE pass scoped to the changed lines. `make test` must be green before review; on failure hand logs to `gocode-testdoctor` (scoped patches only, no redesign) first.
+Plans live in `plans/` (active), `plans/completed/` (shipped, `YYMMDD.NNNN.slug.md`),
+`plans/history/` (abandoned/superseded). One plan per concern.
