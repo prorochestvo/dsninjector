@@ -24,10 +24,6 @@ Pure-Go single package `dsninjector` at the module root - no binaries, no CGO. `
 
 Standard library only at runtime; `testify` is the sole direct require and stays test-only (see Constraints). Go `1.23.3` per `go.mod`.
 
-## File Declaration Order
-
-Public surface at the top, private internals at the bottom - a reader sees everything important first. Per file: (1) exported `const`/`var` + `New<Object>` constructor(s), (2) the struct, (3) its methods (alphabetical preferred), (4) unexported `const`/`var`, (5) unexported auxiliary structs, (6) unexported funcs/methods. Files with no object (free funcs + a data type) follow the same spirit. Multiple structs: primary struct first, same layout - but two large objects in one file usually means split it. Treat a violating file as something to fix.
-
 ## Error Handling
 
 No custom error type - exported funcs return plain `error`. Contract to preserve: wrap propagated failures with `%w` (so callers can `errors.Is`/`errors.As`; `readEnvVarName` also `errors.Join`s the deferred `Close` error), return plain sentinel-free errors for bad input (no regex match, empty/whitespace config), and reserve error-swallowing for the explicitly best-effort `*OrEmpty` helpers (`UnmarshalOrEmpty` returns an empty `DataSourceMapper`, never errors).
