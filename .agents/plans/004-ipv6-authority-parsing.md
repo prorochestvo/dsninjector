@@ -54,7 +54,7 @@ change. The accidental `Addr()` correctness for authority IPv6 becomes
 **intentional** correctness; the broken `Host()`/`Port()` become right.
 
 **Explicitly decoupled from the `net/url` engine question.** Adopting
-`net/url` (`plans/003` Topic 1) would fix IPv6 for free but is a much larger,
+`net/url` (`.agents/plans/003` Topic 1) would fix IPv6 for free but is a much larger,
 behavior-shifting decision that also touches the last-`@` credentials split,
 percent-encoding, and the loose scheme-less inputs this library exists to accept.
 This plan is the **surgical** alternative: three small edits and a test table.
@@ -71,11 +71,11 @@ This plan is the **surgical** alternative: three small edits and a test table.
 
 **Out of scope (do not attempt here):**
 
-- The `net/url` parsing engine and last-`@` credentials split (`plans/003`
+- The `net/url` parsing engine and last-`@` credentials split (`.agents/plans/003`
   Topics 1, and Finding 2) — see OQ-5.
 - Percent **decoding/encoding** of host/zone-id (`%25` ↔ `%`) — zone ids are
   preserved as literal bytes; see OQ-2.
-- Multi-host authorities (`redis://h1,h2`) — `plans/003` Topic 4, unrelated.
+- Multi-host authorities (`redis://h1,h2`) — `.agents/plans/003` Topic 4, unrelated.
 - IPv6 address **validation** (rejecting `[not-an-address]`) — the parser stays
   syntactic/best-effort; see OQ-2.
 
@@ -103,7 +103,7 @@ This plan is the **surgical** alternative: three small edits and a test table.
 6. **No new imports, no CGO, stdlib-only.** `parser.go` already imports `strings`;
    `source.go` already imports `strings` and `fmt`. Every edit uses those.
 7. **Gates on this host:** `gofmt -l .` (empty), `CGO_ENABLED=0 go vet ./...`,
-   `CGO_ENABLED=0 go test .`. Unlike `plans/001`/`002`, a C toolchain is present
+   `CGO_ENABLED=0 go test .`. Unlike `.agents/plans/001`/`002`, a C toolchain is present
    here, so the race gate runs as `CGO_ENABLED=1 go test -race .` (verified green on
    the current tree). **Never** run `CGO_ENABLED=0 go test -race` — that fails with
    `-race requires cgo`.
@@ -457,7 +457,7 @@ parallelizes meaningfully; the whole plan is a few dozen lines plus a test table
   routed to `parseAuthority`. No such DSN exists in this library's accepted set
   (Assumption 2); documented, low risk.
 - **Zone-id `%` and future percent-decoding.** Preserving `%25` literally is correct
-  today and round-trips, but if `plans/003`'s `net/url` engine later adds
+  today and round-trips, but if `.agents/plans/003`'s `net/url` engine later adds
   percent-decoding, `%25`→`%` normalization must be reconciled then. Flagged for
   OQ-5 sequencing, not fixed here.
 - **`-race` toolchain.** Runs here only as `CGO_ENABLED=1 go test -race .` (C
@@ -469,7 +469,7 @@ parallelizes meaningfully; the whole plan is a few dozen lines plus a test table
 - **Surgical bracket-aware split over adopting `net/url` (chose the ~15-line fix).**
   `net/url` fixes IPv6 for free but drags in the last-`@` credentials split,
   percent-encoding, and rejection of the loose scheme-less inputs that are this
-  library's reason to exist — a behavior-shifting redesign (`plans/003` Topic 1).
+  library's reason to exist — a behavior-shifting redesign (`.agents/plans/003` Topic 1).
   IPv6 is a self-contained bug; fixing it in place keeps the 38 guardrails and the
   Telegram trick provably intact and defers the engine question to a real decision
   (OQ-5). Chose the scalpel; the `net/url` swap stays a separate, larger plan.
@@ -555,7 +555,7 @@ construction path. The open part is whether to *also* normalize **on set**
 
 ### OQ-5 — Keep this surgical, or fold IPv6 into the `net/url` engine decision?
 
-`plans/003` Topic 1 weighs adopting `net/url` internally, which would fix IPv6,
+`.agents/plans/003` Topic 1 weighs adopting `net/url` internally, which would fix IPv6,
 the last-`@` split, and percent-encoding together.
 
 - **Lean:** keep IPv6 surgical **now** (this plan), and let the `net/url` decision

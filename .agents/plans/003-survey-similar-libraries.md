@@ -10,7 +10,7 @@ lays out the design questions worth deciding. It is a **decision menu**, not a
 task breakdown: there are no acceptance criteria and no execution order here on
 purpose. Each topic below states a tension, its cost against our core values, and
 a soft lean — but makes no commitment. When a topic is accepted in a later
-session it will get its own `plans/NNN-*.md` with a real breakdown.
+session it will get its own `.agents/plans/NNN-*.md` with a real breakdown.
 
 The correctness findings in this document are real, present-day bugs; they are
 included because they are the strongest evidence for several of the topics, and
@@ -299,7 +299,7 @@ Decide in this order; the reasoning is dependency and cheapness, not leverage:
 6. **Topic 10 (secret policy).** Fold into the plan 002 discussion, since
    `Redacted()` lands there; only the documentation stance is left to ratify.
 
-**Each accepted topic becomes its own `plans/NNN-*.md`** with a real task
+**Each accepted topic becomes its own `.agents/plans/NNN-*.md`** with a real task
 breakdown, acceptance criteria, and execution order. This document creates none
 of that; it exists to make the decisions above informed.
 
